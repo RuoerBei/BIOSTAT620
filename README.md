@@ -1,0 +1,200 @@
+# BIOSTAT620
+course materials from BIOSTAT620
+library(readxl)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+
+screentime_data <- read_excel("/Users/ruoerbei/Documents/BIOSTAT620/screentime.xlsx")
+# Q2.a
+
+# Add a new column to distinguish weekdays from weekends
+screentime_data$DayType <- ifelse(wday(screentime_data$Date) %in% c(1, 7), 'Weekend', 'Weekday')
+
+
+# Plotting time series for Total.ST.min with different color points
+ggplot(screentime_data, aes(x=Date, y=Total.ST.min)) +
+  geom_line() +
+  geom_point(aes(color=DayType)) +
+  theme_minimal() +
+  labs(title="Time Series Plot of Total Screen Time (min)", x="Date", y="Total Screen Time (min)") +
+  scale_color_manual(values=c("Weekday"="black", "Weekend"="red"))
+
+
+ggplot(screentime_data, aes(x=Date, y=Social.ST.min)) +
+  geom_line() +
+  geom_point(aes(color=DayType)) +
+  theme_minimal() +
+  labs(title="Time Series Plot of Social Screen Time (min)", x="Date", y="Social Screen Time (min)") +
+  scale_color_manual(values=c("Weekday"="black", "Weekend"="red"))
+
+ggplot(screentime_data, aes(x=Date, y=Pickups)) +
+  geom_line() +
+  geom_point(aes(color=DayType)) +
+  theme_minimal() +
+  labs(title="Time Series Plot of Pickups", x="Date", y="Pickups") +
+  scale_color_manual(values=c("Weekday"="black", "Weekend"="red"))
+
+
+ggplot(screentime_data, aes(x=Date, y=Proportion.ST)) +
+  geom_line() +
+  geom_point(aes(color=DayType)) +
+  theme_minimal() +
+  labs(title="Time Series Plot of Proportion of Social Screen Time (min)", x="Date", y="Proportion of Social Screen Time (min)") +
+  scale_color_manual(values=c("Weekday"="black", "Weekend"="red"))
+
+ggplot(screentime_data, aes(x=Date, y=Duration.per.use)) +
+  geom_line() +
+  geom_point(aes(color=DayType)) +
+  theme_minimal() +
+  labs(title="Time Series Plot of Daily Duration per Use (min) ", x="Date", y="Daily Duration per Use (min) ") +
+  scale_color_manual(values=c("Weekday"="black", "Weekend"="red"))
+  # Q2.b
+
+
+library(GGally)
+
+ggpairs(screentime_data, 
+        columns=c("Total.ST.min", "Social.ST.min", "Pickups", "Proportion.ST", "Duration.per.use"),
+        columnLabels=c("Total Screen Time", "Social Screen Time", "Pickups", "Proportion of Social Screen Time", "Duration per Use")) + theme_bw()
+
+ggsave("PairwiseScatterplots.png")
+
+# Q2.c
+
+# Occupation time curve
+plot_occupation_time <- function(data, variable) {
+  sorted_data <- sort(data[[variable]])
+  occupation_time <- seq(0, 1, length.out=length(sorted_data))
+  occupation_time <- 1 - occupation_time  # This gives you P(X > c)
+  
+  plot(sorted_data, occupation_time, type='l', main=paste("Occupation Time Curve for", variable), ylab="P(X > c)")
+}
+
+# Apply the adjusted function to each variable
+plot_occupation_time(screentime_data, 'Total.ST.min')
+plot_occupation_time(screentime_data, 'Social.ST.min')
+plot_occupation_time(screentime_data, 'Pickups')
+plot_occupation_time(screentime_data, 'Proportion.ST')
+plot_occupation_time(screentime_data, 'Duration.per.use')
+
+# Density plot
+ggplot(screentime_data, aes(x=Total.ST.min)) +
+  geom_density(fill="blue", alpha=0.5) +
+  labs(title="Density Plot of Total Screen Time (min)", x="Total Screen Time (min)", y="Density")
+
+ggplot(screentime_data, aes(x=Social.ST.min)) +
+  geom_density(fill="blue", alpha=0.5) +
+  labs(title="Density Plot of Social Screen Time (min)", x="Social Screen Time (min)", y="Density")
+
+ggplot(screentime_data, aes(x=Pickups)) +
+  geom_density(fill="blue", alpha=0.5) +
+  labs(title="Density Plot of Pickups", x="Pickups", y="Density")
+
+ggplot(screentime_data, aes(x=Proportion.ST)) +
+  geom_density(fill="blue", alpha=0.5) +
+  labs(title="Density Plot of Proportion.ST", x="Proportion.ST", y="Density")
+
+ggplot(screentime_data, aes(x=Duration.per.use)) +
+  geom_density(fill="blue", alpha=0.5) +
+  labs(title="Density Plot of Duration.per.use", x="Duration.per.use", y="Density")
+
+ # Q1.d
+
+library(forecast)
+
+acf(screentime_data$Total.ST.min)
+acf(screentime_data$Social.ST.min)
+acf(screentime_data$Pickups)
+acf(screentime_data$Proportion.ST)
+acf(screentime_data$Duration.per.use) 
+
+# values
+acf(screentime_data$Total.ST.min, plot=FALSE)
+acf(screentime_data$Social.ST.min, plot=FALSE)
+acf(screentime_data$Pickups, plot=FALSE)
+acf(screentime_data$Proportion.ST, plot=FALSE)
+acf(screentime_data$Duration.per.use, plot=FALSE)
+
+screentime_data <- screentime_data %>%
+  mutate(
+    # Convert the Date column to a date object
+    Date = as.Date(Date),
+    
+    # Convert the Pickup.1st column to a character string and extract the time part
+    Time = sapply(Pickup.1st, function(x) strsplit(as.character(x), " ")[[1]][2]),
+    
+    # Combine the Date and Time into a single POSIXct datetime object
+    DateTime = as.POSIXct(paste(Date, Time), format="%Y-%m-%d %H:%M:%S")
+  )
+
+
+# Q3.a
+
+screentime_data = screentime_data %>%
+  mutate(Pickup.1st.angular = (hour(Pickup.1st)*60+minute(Pickup.1st))/(24*60)*360)
+
+head(screentime_data)
+
+# Q3.b
+
+library(circular)
+
+first.pickup.cir = circular(screentime_data$Pickup.1st.angular, units="degrees", template="clock24")
+
+plot(first.pickup.cir, col="blue")
+
+
+first.pickup.cir.den = density(first.pickup.cir, bw=50)
+plot(first.pickup.cir.den, points.plot=T)
+
+bin_size <-10
+total_bins <- 360 / bin_size
+
+
+plot(first.pickup.cir, stack=TRUE, bins=total_bins, col="blue")
+
+# Q4.b
+
+screentime_data$Total.ST.hr <- screentime_data$Total.ST.min / 60
+
+# for daily number of pickups and total screen time in hours, respectively.
+
+glm_model <- glm(Pickups ~ offset(log(Total.ST.hr)), family = poisson, data = screentime_data)
+summary(glm_model)
+
+# Q4.c
+
+screentime_data$Xt <- ifelse(weekdays(screentime_data$Date) %in% c("Saturday", "Sunday"), 0, 1)
+screentime_data$Zt <- ifelse(screentime_data$Date >= as.Date("2024-01-10"), 1, 0)
+
+log_linear_model <- glm(Pickups ~ Xt + Zt + offset(log(Total.ST.hr)), family = poisson, data = screentime_data)
+summary(log_linear_model)
+
+
+# Q5.a
+
+# The von Mises distribution in the circular package uses radians as the standard unit of measurement for angles.
+# Convert degrees to radians
+screentime_data$Pickup.1st.radians <- with(screentime_data, Pickup.1st.angular * (pi / 180))
+
+# Convert the numeric vector to a 'circular' object
+pickup_circular <- circular(screentime_data$Pickup.1st.radians, units = "radians", template = "none", modulo = "2pi", zero = pi, rotation = "clock")
+
+von_mises_fit <- mle.vonmises(pickup_circular)
+
+von_mises_fit
+
+# Q5.b
+
+# Convert 8:30 AM to radians
+# 8.5 hours out of 24 hours in a day and convert to radians by multipying 2 pi
+angle_830AM <- (8.5 / 24) * 2 * pi 
+
+# CDF for the angle corresponding to 8:30 AM
+cdf_830AM <- pvonmises(angle_830AM, mu = 2.079, kappa = 9.111)
+
+# one minus the CDF value at 8:30 AM to find the cdf after 830am
+prob_after_830AM <- 1 - cdf_830AM
+
+prob_after_830AM
